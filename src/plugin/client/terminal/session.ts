@@ -333,9 +333,23 @@ function send(entry: Entry, frame: ClientFrame): void {
   if (entry.socket.readyState === WebSocket.OPEN) entry.socket.send(JSON.stringify(frame))
 }
 
+/**
+ * The base the desktop shell publishes its Host under, when the page is not
+ * the Host's own: the desktop renderer loads this client from `dsh-app://app`,
+ * so `location.host` is the scheme's hostname rather than the Host's, and a
+ * URL built from it cannot connect. The Web profile leaves the global unset
+ * and the page is served by the Host itself, so `document.baseURI` carries
+ * the same origin there.
+ */
+interface TransportGlobal {
+  streamBaseUrl?: string
+}
+
 function socketUrl(): string {
-  const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${scheme}//${location.host}${SOCKET_PATH}`
+  const transport = (globalThis as { __DSH_TRANSPORT__?: TransportGlobal }).__DSH_TRANSPORT__
+  const url = new URL(SOCKET_PATH.slice(1), transport?.streamBaseUrl ?? document.baseURI)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  return url.href
 }
 
 /** Build a fresh terminal and connect its socket. */
